@@ -1,3 +1,4 @@
+
 name: Build QuasarOS GSI
 
 on:
@@ -46,11 +47,12 @@ jobs:
           mkdir workspace && cd workspace
           repo init -u https://github.com/TrebleDroid/treble_manifest -b android-13.0 -m manifest.xml
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc --all) --force-sync
-          git clone https://github.com/ponces/treble_aosp -b android-13.0 treble_aosp --depth=1
+          git clone https://github.com/ponces/treble_aosp -b android-13.0 treble_build_aosp --depth=1
+          ln -s treble_build_aosp treble_aosp
+          ls -la
 
       - name: Apply QuasarOS Branding
         run: |
-          # Dynamic search for base.mk in phh/treble
           BASE=$(find workspace -name "base.mk" | grep "phh/treble" | head -n 1)
           echo "Found base.mk at: $BASE"
           [ -z "$BASE" ] && exit 1
@@ -80,7 +82,7 @@ jobs:
           rm -rf .repo
           echo "Disk after removing .repo:"
           df -h
-          bash treble_aosp/build.sh arm64_bvN
+          bash treble_build_aosp/build.sh arm64_bvN
 
       - name: Compress & Release
         run: |
