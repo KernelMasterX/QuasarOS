@@ -1,4 +1,4 @@
-Name: Build QuasarOS GSI
+name: Build QuasarOS GSI
 
 on:
   workflow_dispatch:
