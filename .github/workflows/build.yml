@@ -20,7 +20,7 @@ jobs:
           sudo apt-get clean
           df -h
 
-      - name: Clone Sources Cleanly
+      - name: Clone Ponces Treble AOSP Source
         run: |
           sudo apt-get update
           sudo apt-get install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev \
@@ -33,9 +33,8 @@ jobs:
           mkdir -p workspace
           cd workspace
           
-          # -c parametresi GitHub Actions'ın çakışan extraheader token'ını tamamen ezer ve susturur!
-          git -c http.https://github.com/.extraheader="" clone --depth 1 --branch android-13.0 https://github.com/phhusson/treble_aosp.git . || \
-          git -c http.https://github.com/.extraheader="" clone --depth 1 --branch android-13.0 https://github.com/TrebleDroid/treble_aosp.git .
+          # Ponces deposunu ana dal üzerinden tam ve eksiksiz klonluyoruz
+          git clone --depth 1 https://github.com/ponces/treble_aosp.git .
 
       - name: Apply QuasarOS branding
         run: |
@@ -72,7 +71,7 @@ jobs:
           name: QuasarOS v1.0 - Light The Galaxy (KernelMasterX)
           body: |
             QuasarOS v1.0 (Light The Galaxy)
-            * **Branch:** Android 13
+            * **Source:** ponces/treble_aosp
             * **Variant:** arm64_bvN (Standard VNDK, Vanilla)
             * **Maintainer:** KernelMasterX
           files: "${{ env.RELEASE_FILE }}"
