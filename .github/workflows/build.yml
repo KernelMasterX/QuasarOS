@@ -7,7 +7,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [arm64_bvN]
+        variant: [arm64_bvN, arm64_bgN, arm64_bvN-core]
     name: Build ${{ matrix.variant }}
     permissions:
       contents: write
@@ -17,14 +17,15 @@ jobs:
       - name: Setup
         run: |
           sudo apt update
-          sudo apt install -y git python3 python3-pip git-lfs curl xz-utils openjdk-11-jdk
+          sudo apt install -y git python3 python3-pip git-lfs curl xz-utils openjdk-11-jdk zip
           curl -s https://storage.googleapis.com/git-repo-downloads/repo > /tmp/repo
           sudo install /tmp/repo /usr/local/bin/repo
           git config --global user.name "QuasarOS"
           git config --global user.email "quasar@lightthegalaxy.com"
           sudo fallocate -l 12G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+          df -h
 
-      - name: Sync
+      - name: Sync Ponces Source
         run: |
           mkdir workspace && cd workspace
           repo init -u https://android.googlesource.com/platform/manifest -b android-13.0.0_r83 --depth=1
@@ -32,21 +33,56 @@ jobs:
           repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
           bash treble_aosp/build.sh --no-build
 
-      - name: Build
+      - name: QuasarOS Customization - Bootanimation & Branding
+        run: |
+          cd workspace
+          echo "--- Injecting bootanimation.zip ---"
+          if [ -f ../bootanimation.zip ]; then
+            echo "Found bootanimation.zip"
+            mkdir -p treble_aosp/overlay/system/media/
+            cp ../bootanimation.zip treble_aosp/overlay/system/media/bootanimation.zip
+            echo "Copied to overlay/system/media/"
+            mkdir -p device/phh/treble/overlay/
+            echo "PRODUCT_COPY_FILES += \$(LOCAL_PATH)/../../treble_aosp/overlay/system/media/bootanimation.zip:\$(TARGET_COPY_OUT_SYSTEM)/media/bootanimation.zip" >> device/phh/treble/overlay/bootanim.mk || true
+          else
+            echo "bootanimation.zip not found in main, skipping"
+          fi
+          
+          echo "--- Branding QuasarOS ---"
+          echo "ro.quasar.version=v1.0 Light the Galaxy" >> treble_aosp/build.prop
+          echo "ro.quasar.build.by=KernelMasterX" >> treble_aosp/build.prop
+          echo "persist.sys.quasar.anim=1" >> treble_aosp/build.prop
+
+      - name: Build GSI
         run: |
           cd workspace
           . build/envsetup.sh
           lunch treble_${{ matrix.variant }}-userdebug
           make systemimage -j$(nproc --all)
-          xz -9 -T0 -c out/target/product/phhgsi_arm64_ab/system.img > ../${{ matrix.variant }}.img.xz
+
+      - name: Compress & Prepare Release
+        run: |
+          cd workspace
+          echo "--- Final check for bootanimation in built img ---"
+          mkdir -p out/boot_check && sudo mount -o loop out/target/product/phhgsi_arm64_ab/system.img out/boot_check || true
+          ls out/boot_check/media/ || echo "media folder not mounted, but overlay will be included on build"
+          sudo umount out/boot_check || true
+          
+          xz -9 -T0 -c out/target/product/phhgsi_arm64_ab/system.img > ../QuasarOS-v1.0-${{ matrix.variant }}.img.xz
+          ls -lh ../*.img.xz
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0-${{ matrix.variant }}-${{ github.run_number }}
+          tag_name: QuasarOS-v1.0-${{ matrix.variant }}-${{ github.run_number }}
           name: QuasarOS v1.0 - ${{ matrix.variant }} | Light the Galaxy
+          body: |
+            🌌 **QuasarOS v1.0 - Light the Galaxy**
+            Variant: ${{ matrix.variant }}
+            Bootanimation: Included (if bootanimation.zip in main)
+            Built by KernelMasterX
           files: |
-            ${{ matrix.variant }}.img.xz
+            QuasarOS-v1.0-${{ matrix.variant }}.img.xz
             bootanimation.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
