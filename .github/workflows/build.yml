@@ -22,43 +22,22 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          persist-credentials: false
 
-      - name: Set up environment & repo tool
+      - name: Set up environment
         run: |
           sudo apt-get update
           sudo apt-get install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev \
             gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev \
             libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig xz-utils
-          
-          mkdir -p ~/bin
-          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
-          chmod a+x ~/bin/repo
-          echo "$HOME/bin" >> $GITHUB_PATH
 
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Initialize and sync treble_manifest
+      - name: Clone Treble AOSP build tools
         run: |
-          # Git kimlik basliklarini temizle ki anonim git clone engellenmesin
-          git config --global --unset-all http.extraheader || true
-          git config --local --unset-all http.https://github.com/.extraheader || true
-
-          mkdir -p workspace/.repo
+          mkdir -p workspace
           cd workspace
-          
-          git clone https://github.com/phhusson/platform_manifest_phh.git -b android-13.0 .repo/manifests
-          cp .repo/manifests/default.xml .repo/manifest.xml
-          
-          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
-
-      - name: Clone treble_aosp scripts
-        run: |
-          cd workspace
-          git clone https://github.com/TrebleDroid/treble_aosp.git -b android-13.0 treble_aosp || git clone https://github.com/phhusson/treble_aosp.git treble_aosp
-          cp -r treble_aosp/* . || true
+          git clone https://github.com/phhusson/treble_aosp.git -b android-13.0 . || git clone https://github.com/TrebleDroid/treble_aosp.git -b android-13.0 .
 
       - name: Apply QuasarOS branding & inject bootanimation
         run: |
