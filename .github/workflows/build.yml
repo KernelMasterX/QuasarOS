@@ -20,47 +20,30 @@ jobs:
           sudo apt-get clean
           df -h
 
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Set up environment
+      - name: Set up environment & download sources
         run: |
           sudo apt-get update
           sudo apt-get install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev \
             gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev \
             libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig xz-utils
 
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global --unset-all http.extraheader || true
-
-      - name: Clone Treble AOSP build tools
-        run: |
           mkdir -p workspace
           cd workspace
           
-          # Nokta yerine normal klasöre klonlayıp içeri aktarıyoruz (Kimlik hatasını keser)
-          git clone --branch android-13.0 https://github.com/phhusson/treble_aosp.git treble_aosp || git clone --branch android-13.0 https://github.com/TrebleDroid/treble_aosp.git treble_aosp
-          cp -r treble_aosp/* .
+          # Git clone yerine tar.gz arşivi indiriyoruz - Asla kimlik sormaz, takılmaz!
+          curl -L https://github.com/phhusson/treble_aosp/archive/refs/heads/android-13.0.tar.gz -o treble_aosp.tar.gz
+          tar -xzf treble_aosp.tar.gz
+          mv treble_aosp-android-13.0/* .
+          rm -rf treble_aosp.tar.gz treble_aosp-android-13.0
 
-      - name: Apply QuasarOS branding & inject bootanimation
+      - name: Apply QuasarOS branding
         run: |
           cd workspace
           
-          # Custom branding: Light The Galaxy
+          # Custom branding: Light The Galaxy (Maintainer: KernelMasterX)
           sed -i 's/PRODUCT_MODEL := .*/PRODUCT_MODEL := QuasarOS - Light The Galaxy/' device/phh/treble/common.mk 2>/dev/null || true
           echo 'PRODUCT_PROPERTY_OVERRIDES += ro.quasar.display.version=Light The Galaxy' >> device/phh/treble/common.mk
-
-          # Inject bootanimation.zip to system/product/media/bootanimation.zip
-          if [ -f "$GITHUB_WORKSPACE/bootanimation.zip" ]; then
-            mkdir -p device/phh/treble/media
-            cp "$GITHUB_WORKSPACE/bootanimation.zip" device/phh/treble/media/bootanimation.zip
-            echo 'PRODUCT_COPY_FILES += device/phh/treble/media/bootanimation.zip:system/product/media/bootanimation.zip' >> device/phh/treble/common.mk
-          else
-            echo "Warning: bootanimation.zip not found in root workspace directory."
-          fi
+          echo 'PRODUCT_PROPERTY_OVERRIDES += ro.product.maintainer=KernelMasterX' >> device/phh/treble/common.mk
 
       - name: Build arm64_bvN GSI (Standard VNDK)
         run: |
@@ -85,10 +68,11 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: QuasarOS-v1.0
-          name: QuasarOS v1.0 - Light The Galaxy
+          name: QuasarOS v1.0 - Light The Galaxy (KernelMasterX)
           body: |
             QuasarOS v1.0 (Light The Galaxy)
             * **Branch:** Android 13
             * **Variant:** arm64_bvN (Standard VNDK, Vanilla)
+            * **Maintainer:** KernelMasterX
           files: "${{ env.RELEASE_FILE }}"
           
