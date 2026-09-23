@@ -1,9 +1,8 @@
-# QuasarOS
-QuasarOS 🌌 Light the Galaxy | Android GSI Rom Minimal • Fast • Cyan
-# QuasarOS-project 🌌
+
+# QuasarOS 🌌
 ### Light the Galaxy
 
-> An Android 13 GSI Project - Minimal, Fast, Cyan.
+> An Android GSI Rom Project - Minimal, Fast, Cyan.
 
 QuasarOS is a custom Generic System Image (GSI) based on Ponces AOSP 13, designed to light up your device with a clean Cyan universe.
 
