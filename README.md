@@ -4,7 +4,7 @@
 
 > An Android GSI Rom Project - Minimal, Fast, Cyan.
 
-QuasarOS is a custom Generic System Image (GSI) based on Ponces AOSP 13, designed to light up your device with a clean Cyan universe.
+QuasarOS is a custom Generic System Image (GSI) based on AOSP 13, designed to light up your device with a clean Cyan universe.
 
 **Status: First Build - 3 Variants**
 
