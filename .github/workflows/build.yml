@@ -23,6 +23,8 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up environment & repo tool
         run: |
@@ -38,14 +40,18 @@ jobs:
 
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
       - name: Initialize and sync treble_manifest
         run: |
-          mkdir -p workspace
+          mkdir -p workspace/.repo
           cd workspace
           
-          # Doğru phh / Treble manifest deposundan init yapıyoruz
-          repo init -u https://github.com/phhusson/platform_manifest_phh.git -b android-13.0 --depth=1
+          # Manifest reposunu GitHub Token ile çekiyoruz
+          git clone https://github.com/phhusson/platform_manifest_phh.git -b android-13.0 .repo/manifests
+          cp .repo/manifests/default.xml .repo/manifest.xml
+          
+          # Doğrudan senkronizasyon
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
 
       - name: Clone treble_aosp scripts
