@@ -1,0 +1,52 @@
+name: QuasarOS-Build-Release
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [arm64_bvN]
+    name: Build ${{ matrix.variant }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup
+        run: |
+          sudo apt update
+          sudo apt install -y git python3 python3-pip git-lfs curl xz-utils openjdk-11-jdk
+          curl -s https://storage.googleapis.com/git-repo-downloads/repo > /tmp/repo
+          sudo install /tmp/repo /usr/local/bin/repo
+          git config --global user.name "QuasarOS"
+          git config --global user.email "quasar@lightthegalaxy.com"
+          sudo fallocate -l 12G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+
+      - name: Sync
+        run: |
+          mkdir workspace && cd workspace
+          repo init -u https://android.googlesource.com/platform/manifest -b android-13.0.0_r83 --depth=1
+          git clone https://github.com/ponces/treble_aosp -b android-13.0 treble_aosp
+          repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
+          bash treble_aosp/build.sh --no-build
+
+      - name: Build
+        run: |
+          cd workspace
+          . build/envsetup.sh
+          lunch treble_${{ matrix.variant }}-userdebug
+          make systemimage -j$(nproc --all)
+          xz -9 -T0 -c out/target/product/phhgsi_arm64_ab/system.img > ../${{ matrix.variant }}.img.xz
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0-${{ matrix.variant }}-${{ github.run_number }}
+          name: QuasarOS v1.0 - ${{ matrix.variant }} | Light the Galaxy
+          files: |
+            ${{ matrix.variant }}.img.xz
+            bootanimation.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
