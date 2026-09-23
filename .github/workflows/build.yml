@@ -32,24 +32,30 @@ jobs:
 
           mkdir -p workspace
           cd workspace
-          
-          # Doğrudan ponces deposunun Android 13 dalını klonluyoruz
           git clone --depth 1 --branch android-13.0 https://github.com/ponces/treble_aosp.git .
 
       - name: Apply QuasarOS Branding & Inject Bootanimation
         run: |
           cd workspace
           
-          # Custom branding: Light The Galaxy (Maintainer: KernelMasterX)
-          sed -i 's/PRODUCT_MODEL := .*/PRODUCT_MODEL := QuasarOS - Light The Galaxy/' device/phh/treble/common.mk 2>/dev/null || true
-          echo 'PRODUCT_PROPERTY_OVERRIDES += ro.quasar.display.version=Light The Galaxy' >> device/phh/treble/common.mk
-          echo 'PRODUCT_PROPERTY_OVERRIDES += ro.product.maintainer=KernelMasterX' >> device/phh/treble/common.mk
+          # common.mk dosyasını kaynak ağacında dinamik olarak bulup güncelliyoruz
+          COMMON_MK=$(find . -name "common.mk" | head -n 1)
+          if [ -n "$COMMON_MK" ]; then
+            echo "Found common.mk at: $COMMON_MK"
+            sed -i 's/PRODUCT_MODEL := .*/PRODUCT_MODEL := QuasarOS - Light The Galaxy/' "$COMMON_MK" 2>/dev/null || true
+            echo 'PRODUCT_PROPERTY_OVERRIDES += ro.quasar.display.version=Light The Galaxy' >> "$COMMON_MK"
+            echo 'PRODUCT_PROPERTY_OVERRIDES += ro.product.maintainer=KernelMasterX' >> "$COMMON_MK"
+          else
+            echo "Warning: common.mk not found, skipping branding injection."
+          fi
 
           # Inject bootanimation.zip if present in repository root
           if [ -f "$GITHUB_WORKSPACE/bootanimation.zip" ]; then
-            mkdir -p device/phh/treble/media
-            cp "$GITHUB_WORKSPACE/bootanimation.zip" device/phh/treble/media/bootanimation.zip
-            echo 'PRODUCT_COPY_FILES += device/phh/treble/media/bootanimation.zip:system/product/media/bootanimation.zip' >> device/phh/treble/common.mk
+            MEDIA_DIR=$(dirname "$(find . -name "common.mk" | head -n 1)")/media
+            mkdir -p "$MEDIA_DIR"
+            cp "$GITHUB_WORKSPACE/bootanimation.zip" "$MEDIA_DIR/bootanimation.zip"
+            COMMON_MK=$(find . -name "common.mk" | head -n 1)
+            echo 'PRODUCT_COPY_FILES += $(call find-copy-subdir-files,*,$(LOCAL_PATH)/media,system/product/media)' >> "$COMMON_MK"
             echo "Bootanimation successfully injected!"
           else
             echo "Notice: bootanimation.zip not found in repository root, skipping."
