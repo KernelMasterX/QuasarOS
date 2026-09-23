@@ -7,7 +7,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [arm64_bvN] # SADECE bvN - bgN'i sildik
+        variant: [arm64_bvN]
     name: Build ${{ matrix.variant }}
     permissions:
       contents: write
@@ -17,7 +17,7 @@ jobs:
       - name: Free Disk Space - CRITICAL
         uses: easimon/maximize-build-space@master
         with:
-          root-reserve-mb: 8192
+          root-reserve-mb: 10240
           swap-size-mb: 20480
           remove-dotnet: 'true'
           remove-android: 'true'
@@ -27,14 +27,16 @@ jobs:
 
       - name: Setup
         run: |
-          sudo apt update -y
-          sudo apt install -y git python3 curl xz-utils openjdk-11-jdk zip git-lfs
+          sudo rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+          sudo apt-get clean
+          # apt update YOK - disk dolduruyor, zaten hepsi yüklü
           curl -s https://storage.googleapis.com/git-repo-downloads/repo > /tmp/repo
           sudo install /tmp/repo /usr/local/bin/repo
           git config --global user.name "QuasarOS"
           git config --global user.email "quasar@lightthegalaxy.com"
           df -h
           free -h
+          java -version
 
       - name: Sync Ponces Source
         run: |
@@ -42,46 +44,4 @@ jobs:
           repo init -u https://android.googlesource.com/platform/manifest -b android-13.0.0_r83 --depth=1
           git clone https://github.com/ponces/treble_aosp -b android-13.0 treble_aosp
           repo sync -c -j4 --force-sync --no-clone-bundle --no-tags --optimized-fetch --prune
-          bash treble_aosp/build.sh --no-build
-
-      - name: QuasarOS Customization
-        run: |
-          cd workspace
-          echo "--- Injecting bootanimation.zip ---"
-          if [ -f ../bootanimation.zip ]; then
-            mkdir -p treble_aosp/overlay/system/media/
-            cp ../bootanimation.zip treble_aosp/overlay/system/media/bootanimation.zip
-          else
-            echo "bootanimation.zip not found, skipping"
-          fi
-          
-          echo "--- Branding QuasarOS ---"
-          echo "ro.quasar.version=v1.0 Light the Galaxy" >> treble_aosp/build.prop
-          echo "ro.quasar.build.by=KernelMasterX" >> treble_aosp/build.prop
-
-      - name: Build GSI
-        run: |
-          cd workspace
-          . build/envsetup.sh
-          lunch treble_${{ matrix.variant }}-userdebug
-          make systemimage -j2
-
-      - name: Compress & Prepare Release
-        run: |
-          cd workspace
-          xz -9 -T0 -c out/target/product/phhgsi_arm64_ab/system.img > ../QuasarOS-v1.0-${{ matrix.variant }}.img.xz
-          ls -lh ../*.img.xz
-
-      - name: Upload to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: QuasarOS-v1.0-${{ matrix.variant }}-${{ github.run_number }}
-          name: QuasarOS v1.0 - ${{ matrix.variant }} | Light the Galaxy
-          body: |
-            🌌 **QuasarOS v1.0 - Light the Galaxy**
-            Variant: ${{ matrix.variant }}
-            Built by KernelMasterX
-          files: |
-            QuasarOS-v1.0-${{ matrix.variant }}.img.xz
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          bash treble_aosp/build.sh
