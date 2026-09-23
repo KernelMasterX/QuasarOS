@@ -20,21 +20,21 @@ jobs:
           sudo apt-get clean
           df -h
 
-      - name: Set up environment & download sources
+      - name: Set up environment & clone sources
         run: |
           sudo apt-get update
           sudo apt-get install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev \
             gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev \
             libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig xz-utils
 
+          git config --global user.name "KernelMasterX"
+          git config --global user.email "KernelMasterX@users.noreply.github.com"
+
           mkdir -p workspace
           cd workspace
           
-          # Git clone yerine tar.gz arşivi indiriyoruz - Asla kimlik sormaz, takılmaz!
-          curl -L https://github.com/phhusson/treble_aosp/archive/refs/heads/android-13.0.tar.gz -o treble_aosp.tar.gz
-          tar -xzf treble_aosp.tar.gz
-          mv treble_aosp-android-13.0/* .
-          rm -rf treble_aosp.tar.gz treble_aosp-android-13.0
+          # Checkout adımı olmadığı için bu git clone hiç takılmadan şakır şakır çalışacak!
+          git clone --depth 1 --branch android-13.0 https://github.com/phhusson/treble_aosp.git . || git clone --depth 1 --branch android-13.0 https://github.com/TrebleDroid/treble_aosp.git .
 
       - name: Apply QuasarOS branding
         run: |
