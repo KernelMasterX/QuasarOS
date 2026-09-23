@@ -43,7 +43,7 @@ jobs:
         run: |
           mkdir -p workspace
           cd workspace
-          repo init -u https://github.com/ponces/treble_manifest.git -b android-13 --depth=1 -m android-13.0.0_r83.xml
+          repo init -u https://github.com/ponces/treble_manifest.git -b android-13 --depth=1
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
           git clone https://github.com/ponces/treble_aosp.git -b android-13 treble_aosp
 
@@ -76,7 +76,7 @@ jobs:
           if [ -n "$IMG_FILE" ]; then
             xz -9 -v -T0 "$IMG_FILE"
             XZ_PATH=$(find out/target/product -name "system-*.img.xz" | head -n 1)
-            echo "RELEASE_FILE=workspace/$XZ_PATH" >> $GITHUB_ENV
+            echo "RELEASE_FILE=$GITHUB_WORKSPACE/workspace/$XZ_PATH" >> $GITHUB_ENV
           else
             echo "Build failed: system image not found."
             exit 1
@@ -91,6 +91,5 @@ jobs:
             QuasarOS v1.0 (Light The Galaxy)
             * **Branch:** Android 13
             * **Variant:** arm64_bvN (Standard VNDK, Vanilla)
-            * **Manifest:** android-13.0.0_r83
           files: ${{ env.RELEASE_FILE }}
           
