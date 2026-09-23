@@ -1,47 +1,96 @@
-name: QuasarOS-Build-Release
+Name: Build QuasarOS GSI
+
 on:
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-22.04
-    strategy:
-      fail-fast: false
-      matrix:
-        variant: [arm64_bvN]
-    name: Build ${{ matrix.variant }}
     permissions:
       contents: write
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Free Disk Space - CRITICAL
-        uses: easimon/maximize-build-space@master
+    steps:
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@v10
         with:
-          root-reserve-mb: 10240
-          swap-size-mb: 20480
+          root-reserve-mb: 8192
+          swap-size-mb: 10240
           remove-dotnet: 'true'
           remove-android: 'true'
           remove-haskell: 'true'
           remove-codeql: 'true'
           remove-docker-images: 'true'
 
-      - name: Setup
-        run: |
-          sudo rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
-          sudo apt-get clean
-          # apt update YOK - disk dolduruyor, zaten hepsi yüklü
-          curl -s https://storage.googleapis.com/git-repo-downloads/repo > /tmp/repo
-          sudo install /tmp/repo /usr/local/bin/repo
-          git config --global user.name "QuasarOS"
-          git config --global user.email "quasar@lightthegalaxy.com"
-          df -h
-          free -h
-          java -version
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Sync Ponces Source
+      - name: Set up environment & repo tool
         run: |
-          mkdir workspace && cd workspace
-          repo init -u https://android.googlesource.com/platform/manifest -b android-13.0.0_r83 --depth=1
-          git clone https://github.com/ponces/treble_aosp -b android-13.0 treble_aosp
-          repo sync -c -j4 --force-sync --no-clone-bundle --no-tags --optimized-fetch --prune
-          bash treble_aosp/build.sh
+          sudo apt-get update
+          sudo apt-get install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev \
+            gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev \
+            libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig xz-utils
+          
+          mkdir -p ~/bin
+          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          chmod a+x ~/bin/repo
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Initialize and sync treble_aosp
+        run: |
+          mkdir -p workspace
+          cd workspace
+          repo init -u https://github.com/ponces/treble_manifest.git -b android-13 --depth=1 -m android-13.0.0_r83.xml
+          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
+          git clone https://github.com/ponces/treble_aosp.git -b android-13 treble_aosp
+
+      - name: Apply QuasarOS branding & inject bootanimation
+        run: |
+          cd workspace
+          
+          # Custom branding: Light The Galaxy
+          sed -i 's/PRODUCT_MODEL := .*/PRODUCT_MODEL := QuasarOS - Light The Galaxy/' device/phh/treble/common.mk 2>/dev/null || true
+          echo 'PRODUCT_PROPERTY_OVERRIDES += ro.quasar.display.version=Light The Galaxy' >> device/phh/treble/common.mk
+
+          # Inject bootanimation.zip to system/product/media/bootanimation.zip
+          if [ -f "$GITHUB_WORKSPACE/bootanimation.zip" ]; then
+            mkdir -p device/phh/treble/media
+            cp "$GITHUB_WORKSPACE/bootanimation.zip" device/phh/treble/media/bootanimation.zip
+            echo 'PRODUCT_COPY_FILES += device/phh/treble/media/bootanimation.zip:system/product/media/bootanimation.zip' >> device/phh/treble/common.mk
+          else
+            echo "Warning: bootanimation.zip not found in root workspace directory."
+          fi
+
+      - name: Build arm64_bvN GSI (Standard VNDK)
+        run: |
+          cd workspace
+          bash treble_aosp/build.sh arm64_bvN
+
+      - name: Compress system image
+        run: |
+          cd workspace
+          IMG_FILE=$(find out/target/product -name "system-*.img" | head -n 1)
+          if [ -n "$IMG_FILE" ]; then
+            xz -9 -v -T0 "$IMG_FILE"
+            XZ_PATH=$(find out/target/product -name "system-*.img.xz" | head -n 1)
+            echo "RELEASE_FILE=workspace/$XZ_PATH" >> $GITHUB_ENV
+          else
+            echo "Build failed: system image not found."
+            exit 1
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: QuasarOS-v1.0
+          name: QuasarOS v1.0 - Light The Galaxy
+          body: |
+            QuasarOS v1.0 (Light The Galaxy)
+            * **Branch:** Android 13
+            * **Variant:** arm64_bvN (Standard VNDK, Vanilla)
+            * **Manifest:** android-13.0.0_r83
+          files: ${{ env.RELEASE_FILE }}
+          
