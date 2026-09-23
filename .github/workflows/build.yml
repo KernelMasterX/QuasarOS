@@ -22,6 +22,8 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up environment & repo tool
         run: |
@@ -40,6 +42,10 @@ jobs:
 
       - name: Initialize and sync treble_manifest
         run: |
+          # Git kimlik basliklarini temizle ki anonim git clone engellenmesin
+          git config --global --unset-all http.extraheader || true
+          git config --local --unset-all http.https://github.com/.extraheader || true
+
           mkdir -p workspace/.repo
           cd workspace
           
