@@ -44,10 +44,10 @@ jobs:
       - name: Repo Init & Sync
         run: |
           mkdir workspace && cd workspace
-          # -m manifest.xml eklenerek default.xml hatası çözüldü
+          # TrebleDroid Manifest + ponces build script kombinasyonu
           repo init -u https://github.com/TrebleDroid/treble_manifest -b android-13.0 -m manifest.xml --depth=1
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc --all)
-          git clone https://github.com/TrebleDroid/treble_aosp -b android-13.0 treble_aosp --depth=1
+          git clone https://github.com/ponces/treble_aosp -b android-13.0 treble_aosp --depth=1
 
       - name: Apply QuasarOS Branding
         run: |
