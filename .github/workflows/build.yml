@@ -38,13 +38,18 @@ jobs:
 
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global core.askPass ""
+          git config --global http.postBuffer 524288000
+          git config --global http.sslVerify false
 
       - name: Initialize and sync treble_manifest
         run: |
           mkdir -p workspace
           cd workspace
-          repo init -u https://github.com/ponces/treble_manifest.git -b android-13 --depth=1 || repo init -u https://github.com/ponces/treble_manifest.git -b main --depth=1
+          
+          # Direct clone to bypass interactive auth prompts
+          git clone https://github.com/ponces/treble_manifest.git -b android-13 .repo/manifests || git clone https://github.com/ponces/treble_manifest.git .repo/manifests
+          
+          repo init -m default.xml
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
 
       - name: Clone treble_aosp scripts
