@@ -44,13 +44,17 @@ jobs:
       - name: Repo Init & Sync
         run: |
           mkdir workspace && cd workspace
-          # TrebleDroid Manifest + ponces build script kombinasyonu
-          repo init -u https://github.com/TrebleDroid/treble_manifest -b android-13.0 -m manifest.xml --depth=1
-          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc --all)
+          repo init -u https://github.com/TrebleDroid/treble_manifest -b android-13.0 -m manifest.xml
+          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc --all) --force-sync
+          ls -la
           git clone https://github.com/ponces/treble_aosp -b android-13.0 treble_aosp --depth=1
+          ls -la treble_aosp/phh/treble/base.mk
 
       - name: Apply QuasarOS Branding
         run: |
+          set -x
+          ls -la workspace/
+          ls -la workspace/treble_aosp/phh/treble/ || exit 1
           cd workspace/treble_aosp
           echo '' >> phh/treble/base.mk
           echo 'PRODUCT_MODEL := QuasarOS - Light The Galaxy' >> phh/treble/base.mk
