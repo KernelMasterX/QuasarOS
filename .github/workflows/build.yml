@@ -34,21 +34,16 @@ jobs:
 
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Git kimlik cakisnalarini sifirla
           git config --global --unset-all http.extraheader || true
-          git config --system --unset-all http.extraheader || true
 
       - name: Clone Treble AOSP build tools
         run: |
-          # Yerel git config temizligi
-          git config --local --unset-all http.https://github.com/.extraheader || true
-
           mkdir -p workspace
           cd workspace
           
-          # Doğrudan token kısıtlamasız public clone
-          git clone --branch android-13.0 https://github.com/phhusson/treble_aosp.git . || git clone --branch android-13.0 https://github.com/TrebleDroid/treble_aosp.git .
+          # Nokta yerine normal klasöre klonlayıp içeri aktarıyoruz (Kimlik hatasını keser)
+          git clone --branch android-13.0 https://github.com/phhusson/treble_aosp.git treble_aosp || git clone --branch android-13.0 https://github.com/TrebleDroid/treble_aosp.git treble_aosp
+          cp -r treble_aosp/* .
 
       - name: Apply QuasarOS branding & inject bootanimation
         run: |
