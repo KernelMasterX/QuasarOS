@@ -44,8 +44,8 @@ jobs:
       - name: Repo Init & Sync
         run: |
           mkdir workspace && cd workspace
-          # TrebleDroid organizasyonuna taşınan güncel repolar
-          repo init -u https://github.com/TrebleDroid/treble_manifest -b android-13.0 --depth=1 --groups=all,-notdefault,-device,-mips,-darwin,-x86
+          # -m manifest.xml eklenerek default.xml hatası çözüldü
+          repo init -u https://github.com/TrebleDroid/treble_manifest -b android-13.0 -m manifest.xml --depth=1
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc --all)
           git clone https://github.com/TrebleDroid/treble_aosp -b android-13.0 treble_aosp --depth=1
 
