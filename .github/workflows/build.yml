@@ -10,16 +10,15 @@ jobs:
       contents: write
 
     steps:
-      - name: Maximize build space
-        uses: easimon/maximize-build-space@v10
-        with:
-          root-reserve-mb: 8192
-          swap-size-mb: 10240
-          remove-dotnet: 'true'
-          remove-android: 'true'
-          remove-haskell: 'true'
-          remove-codeql: 'true'
-          remove-docker-images: 'true'
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          sudo apt-get clean
+          df -h
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -44,11 +43,9 @@ jobs:
           mkdir -p workspace/.repo
           cd workspace
           
-          # Public depoyu herhangi bir token zorlaması olmadan temiz sekilde klonluyoruz
           git clone https://github.com/phhusson/platform_manifest_phh.git -b android-13.0 .repo/manifests
           cp .repo/manifests/default.xml .repo/manifest.xml
           
-          # Senkronizasyon
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
 
       - name: Clone treble_aosp scripts
