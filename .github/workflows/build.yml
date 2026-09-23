@@ -38,18 +38,19 @@ jobs:
 
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global core.askPass ""
 
       - name: Initialize and sync treble_manifest
         run: |
           mkdir -p workspace
           cd workspace
-          repo init -u https://github.com/ponces/treble_manifest.git -b android-13 --depth=1
+          repo init -u https://github.com/ponces/treble_manifest.git -b android-13 --depth=1 || repo init -u https://github.com/ponces/treble_manifest.git -b main --depth=1
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
 
       - name: Clone treble_aosp scripts
         run: |
           cd workspace
-          git clone https://github.com/ponces/treble_aosp.git -b android-13 treble_aosp
+          git clone https://github.com/ponces/treble_aosp.git -b android-13 treble_aosp || git clone https://github.com/ponces/treble_aosp.git treble_aosp
           cp -r treble_aosp/* . || true
 
       - name: Apply QuasarOS branding & inject bootanimation
