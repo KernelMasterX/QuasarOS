@@ -20,7 +20,7 @@ jobs:
           sudo apt-get clean
           df -h
 
-      - name: Clone Ponces Treble AOSP Source
+      - name: Clone Ponces Treble AOSP (Android 13)
         run: |
           sudo apt-get update
           sudo apt-get install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev \
@@ -33,10 +33,10 @@ jobs:
           mkdir -p workspace
           cd workspace
           
-          # Ponces deposunu ana dal üzerinden tam ve eksiksiz klonluyoruz
-          git clone --depth 1 https://github.com/ponces/treble_aosp.git .
+          # Doğrudan ponces deposunun Android 13 dalını klonluyoruz
+          git clone --depth 1 --branch android-13.0 https://github.com/ponces/treble_aosp.git .
 
-      - name: Apply QuasarOS branding
+      - name: Apply QuasarOS Branding & Inject Bootanimation
         run: |
           cd workspace
           
@@ -44,6 +44,16 @@ jobs:
           sed -i 's/PRODUCT_MODEL := .*/PRODUCT_MODEL := QuasarOS - Light The Galaxy/' device/phh/treble/common.mk 2>/dev/null || true
           echo 'PRODUCT_PROPERTY_OVERRIDES += ro.quasar.display.version=Light The Galaxy' >> device/phh/treble/common.mk
           echo 'PRODUCT_PROPERTY_OVERRIDES += ro.product.maintainer=KernelMasterX' >> device/phh/treble/common.mk
+
+          # Inject bootanimation.zip if present in repository root
+          if [ -f "$GITHUB_WORKSPACE/bootanimation.zip" ]; then
+            mkdir -p device/phh/treble/media
+            cp "$GITHUB_WORKSPACE/bootanimation.zip" device/phh/treble/media/bootanimation.zip
+            echo 'PRODUCT_COPY_FILES += device/phh/treble/media/bootanimation.zip:system/product/media/bootanimation.zip' >> device/phh/treble/common.mk
+            echo "Bootanimation successfully injected!"
+          else
+            echo "Notice: bootanimation.zip not found in repository root, skipping."
+          fi
 
       - name: Build arm64_bvN GSI (Standard VNDK)
         run: |
@@ -71,7 +81,7 @@ jobs:
           name: QuasarOS v1.0 - Light The Galaxy (KernelMasterX)
           body: |
             QuasarOS v1.0 (Light The Galaxy)
-            * **Source:** ponces/treble_aosp
+            * **Source:** ponces/treble_aosp (Android 13)
             * **Variant:** arm64_bvN (Standard VNDK, Vanilla)
             * **Maintainer:** KernelMasterX
           files: "${{ env.RELEASE_FILE }}"
