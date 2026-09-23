@@ -41,10 +41,14 @@ jobs:
 
       - name: Initialize and sync treble_manifest
         run: |
-          mkdir -p workspace
+          mkdir -p workspace/.repo
           cd workspace
           
-          repo init -u https://github.com/ponces/treble_manifest.git -b android-13 --depth=1 --no-repo-verify
+          # Clone manifest directly into .repo/manifests to bypass repo init auth checks
+          git clone https://github.com/ponces/treble_manifest.git -b android-13 .repo/manifests
+          cp .repo/manifests/default.xml .repo/manifest.xml
+          
+          # Sync repositories
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
 
       - name: Clone treble_aosp scripts
