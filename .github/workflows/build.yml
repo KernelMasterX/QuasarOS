@@ -7,22 +7,32 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [arm64_bvN, arm64_bgN, arm64_bvN-core]
+        variant: [arm64_bvN, arm64_bgN]
     name: Build ${{ matrix.variant }}
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
 
+      - name: Free Disk Space - CRITICAL
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 5120
+          swap-size-mb: 16384
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-docker-images: 'true'
+
       - name: Setup
         run: |
-          sudo apt update
-          sudo apt install -y git python3 python3-pip git-lfs curl xz-utils openjdk-11-jdk zip
+          sudo apt update -y
+          sudo apt install -y git python3 curl xz-utils openjdk-11-jdk zip git-lfs
           curl -s https://storage.googleapis.com/git-repo-downloads/repo > /tmp/repo
           sudo install /tmp/repo /usr/local/bin/repo
           git config --global user.name "QuasarOS"
           git config --global user.email "quasar@lightthegalaxy.com"
-          sudo fallocate -l 12G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
           df -h
 
       - name: Sync Ponces Source
@@ -30,28 +40,23 @@ jobs:
           mkdir workspace && cd workspace
           repo init -u https://android.googlesource.com/platform/manifest -b android-13.0.0_r83 --depth=1
           git clone https://github.com/ponces/treble_aosp -b android-13.0 treble_aosp
-          repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
+          repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags --optimized-fetch --prune
           bash treble_aosp/build.sh --no-build
 
-      - name: QuasarOS Customization - Bootanimation & Branding
+      - name: QuasarOS Customization
         run: |
           cd workspace
           echo "--- Injecting bootanimation.zip ---"
           if [ -f ../bootanimation.zip ]; then
-            echo "Found bootanimation.zip"
             mkdir -p treble_aosp/overlay/system/media/
             cp ../bootanimation.zip treble_aosp/overlay/system/media/bootanimation.zip
-            echo "Copied to overlay/system/media/"
-            mkdir -p device/phh/treble/overlay/
-            echo "PRODUCT_COPY_FILES += \$(LOCAL_PATH)/../../treble_aosp/overlay/system/media/bootanimation.zip:\$(TARGET_COPY_OUT_SYSTEM)/media/bootanimation.zip" >> device/phh/treble/overlay/bootanim.mk || true
           else
-            echo "bootanimation.zip not found in main, skipping"
+            echo "bootanimation.zip not found, skipping"
           fi
           
           echo "--- Branding QuasarOS ---"
           echo "ro.quasar.version=v1.0 Light the Galaxy" >> treble_aosp/build.prop
           echo "ro.quasar.build.by=KernelMasterX" >> treble_aosp/build.prop
-          echo "persist.sys.quasar.anim=1" >> treble_aosp/build.prop
 
       - name: Build GSI
         run: |
@@ -63,11 +68,6 @@ jobs:
       - name: Compress & Prepare Release
         run: |
           cd workspace
-          echo "--- Final check for bootanimation in built img ---"
-          mkdir -p out/boot_check && sudo mount -o loop out/target/product/phhgsi_arm64_ab/system.img out/boot_check || true
-          ls out/boot_check/media/ || echo "media folder not mounted, but overlay will be included on build"
-          sudo umount out/boot_check || true
-          
           xz -9 -T0 -c out/target/product/phhgsi_arm64_ab/system.img > ../QuasarOS-v1.0-${{ matrix.variant }}.img.xz
           ls -lh ../*.img.xz
 
@@ -79,7 +79,6 @@ jobs:
           body: |
             🌌 **QuasarOS v1.0 - Light the Galaxy**
             Variant: ${{ matrix.variant }}
-            Bootanimation: Included (if bootanimation.zip in main)
             Built by KernelMasterX
           files: |
             QuasarOS-v1.0-${{ matrix.variant }}.img.xz
