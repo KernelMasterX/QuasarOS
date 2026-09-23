@@ -46,31 +46,32 @@ jobs:
           mkdir workspace && cd workspace
           repo init -u https://github.com/TrebleDroid/treble_manifest -b android-13.0 -m manifest.xml
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc --all) --force-sync
-          ls -la
           git clone https://github.com/ponces/treble_aosp -b android-13.0 treble_aosp --depth=1
-          ls -la treble_aosp/phh/treble/base.mk
 
       - name: Apply QuasarOS Branding
         run: |
-          set -x
-          ls -la workspace/
-          ls -la workspace/treble_aosp/phh/treble/ || exit 1
-          cd workspace/treble_aosp
-          echo '' >> phh/treble/base.mk
-          echo 'PRODUCT_MODEL := QuasarOS - Light The Galaxy' >> phh/treble/base.mk
-          echo 'PRODUCT_BRAND := QuasarOS' >> phh/treble/base.mk
-          echo 'PRODUCT_PROPERTY_OVERRIDES += ro.quasar.display.version=Light\ The\ Galaxy' >> phh/treble/base.mk
-          echo 'PRODUCT_PROPERTY_OVERRIDES += ro.product.maintainer=KernelMasterX' >> phh/treble/base.mk
+          # Dynamic search for base.mk in phh/treble
+          BASE=$(find workspace -name "base.mk" | grep "phh/treble" | head -n 1)
+          echo "Found base.mk at: $BASE"
+          [ -z "$BASE" ] && exit 1
+          echo '' >> "$BASE"
+          echo 'PRODUCT_MODEL := QuasarOS - Light The Galaxy' >> "$BASE"
+          echo 'PRODUCT_BRAND := QuasarOS' >> "$BASE"
+          echo 'PRODUCT_PROPERTY_OVERRIDES += ro.quasar.display.version=Light\ The\ Galaxy' >> "$BASE"
+          echo 'PRODUCT_PROPERTY_OVERRIDES += ro.product.maintainer=KernelMasterX' >> "$BASE"
+          cat "$BASE" | tail -10
 
       - name: Inject Bootanimation
         run: |
-          if [ -f "bootanimation.zip" ]; then
-            mkdir -p workspace/treble_aosp/phh/treble/media
-            cp bootanimation.zip workspace/treble_aosp/phh/treble/media/bootanimation.zip
-            echo 'PRODUCT_COPY_FILES += phh/treble/media/bootanimation.zip:$(TARGET_COPY_OUT_PRODUCT)/media/bootanimation.zip' >> workspace/treble_aosp/phh/treble/base.mk
+          BASE=$(find workspace -name "base.mk" | grep "phh/treble" | head -n 1)
+          if [ -n "$BASE" ] && [ -f "bootanimation.zip" ]; then
+            BASE_DIR=$(dirname "$BASE")
+            mkdir -p "$BASE_DIR/media"
+            cp bootanimation.zip "$BASE_DIR/media/bootanimation.zip"
+            echo 'PRODUCT_COPY_FILES += device/phh/treble/media/bootanimation.zip:$(TARGET_COPY_OUT_PRODUCT)/media/bootanimation.zip' >> "$BASE"
             echo "Bootanimation injected successfully!"
           else
-            echo "No bootanimation.zip found in repository root, skipping."
+            echo "bootanimation.zip not found or base.mk missing, skipping injection."
           fi
 
       - name: Build arm64_bvN
