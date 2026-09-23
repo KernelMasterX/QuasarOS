@@ -20,26 +20,28 @@ jobs:
           sudo apt-get clean
           df -h
 
-      - name: Download Sources Safely
+      - name: Clone Sources Cleanly
         run: |
           sudo apt-get update
           sudo apt-get install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev \
             gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev \
             libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig xz-utils
 
+          git config --global user.name "KernelMasterX"
+          git config --global user.email "KernelMasterX@users.noreply.github.com"
+
           mkdir -p workspace
           cd workspace
           
-          # Git clone yok, şifre sorma yok! Direkt resmi kaynak arşivini indiriyoruz.
-          curl -L https://github.com/phhusson/treble_aosp/archive/refs/heads/android-13.0.zip -o source.zip || curl -L https://github.com/TrebleDroid/treble_aosp/archive/refs/heads/android-13.0.zip -o source.zip
-          unzip -q source.zip
-          cp -r treble_aosp-android-13.0/* .
-          rm -rf source.zip treble_aosp-android-13.0
+          # -c parametresi GitHub Actions'ın çakışan extraheader token'ını tamamen ezer ve susturur!
+          git -c http.https://github.com/.extraheader="" clone --depth 1 --branch android-13.0 https://github.com/phhusson/treble_aosp.git . || \
+          git -c http.https://github.com/.extraheader="" clone --depth 1 --branch android-13.0 https://github.com/TrebleDroid/treble_aosp.git .
 
       - name: Apply QuasarOS branding
         run: |
           cd workspace
           
+          # Custom branding: Light The Galaxy (Maintainer: KernelMasterX)
           sed -i 's/PRODUCT_MODEL := .*/PRODUCT_MODEL := QuasarOS - Light The Galaxy/' device/phh/treble/common.mk 2>/dev/null || true
           echo 'PRODUCT_PROPERTY_OVERRIDES += ro.quasar.display.version=Light The Galaxy' >> device/phh/treble/common.mk
           echo 'PRODUCT_PROPERTY_OVERRIDES += ro.product.maintainer=KernelMasterX' >> device/phh/treble/common.mk
