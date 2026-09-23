@@ -10,34 +10,29 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # Disk alanını maksimum düzeye çıkarma
+      # 1. Önce diski büyütüp workspace'i /mnt alanına v10 sürümüyle bağlıyoruz
       - name: Maximize Build Space
-        uses: easimon/maximize-build-space@master
+        uses: easimon/maximize-build-space@v10
         with:
-          root-reserve-mb: 512
-          swap-size-mb: 1024
+          root-reserve-mb: 8192
+          swap-size-mb: 2048
+          build-mount-path: ${{ github.workspace }}
           remove-dotnet: 'true'
           remove-android: 'true'
           remove-haskell: 'true'
           remove-codeql: 'true'
           remove-docker-images: 'true'
 
-      - name: Free Extra Disk Space
-        run: |
-          sudo apt-get purge -yq firefox* google* dotnet* php* android* || true
-          sudo rm -rf /usr/share/dotnet /opt/hostedtoolcache /usr/local/lib/android /usr/share/swift
-          sudo docker image prune --all --force
-          df -h
+      # 2. Büyütülen diskin üzerine repoyu ve bootanimation.zip'i çekiyoruz
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Install Deps & Repo & Auth
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev \
             gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses-dev x11proto-core-dev libx11-dev \
-            lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig python3 openjdk-8-jdk
+            lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig python3 openjdk-11-jdk
           
           git config --global user.name "KernelMasterX"
           git config --global user.email "KernelMasterX@users.noreply.github.com"
@@ -55,6 +50,8 @@ jobs:
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc --all) --force-sync
           git clone https://github.com/ponces/treble_aosp -b android-13.0 treble_build_aosp --depth=1
           ln -s treble_build_aosp treble_aosp
+          echo "Disk after sync:"
+          df -h
           ls -la
 
       - name: Apply QuasarOS Branding
@@ -85,10 +82,11 @@ jobs:
       - name: Build arm64_bvN
         run: |
           cd workspace
-          # Build öncesi .repo klasörünü uçurup devasa alan kazanıyoruz
           rm -rf .repo
           echo "Disk after removing .repo:"
           df -h
+          export WITHOUT_CHECK_API=true
+          export CCACHE_DISABLE=1
           bash treble_build_aosp/build.sh arm64_bvN
 
       - name: Compress & Release
