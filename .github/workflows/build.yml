@@ -25,14 +25,17 @@ jobs:
           echo "After:"
           df -h
 
-      - name: Install Deps & Repo
+      - name: Install Deps & Repo & Auth
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev \
             gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses-dev x11proto-core-dev libx11-dev \
             lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig python3 openjdk-8-jdk
+          
           git config --global user.name "KernelMasterX"
           git config --global user.email "KernelMasterX@users.noreply.github.com"
+          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+
           mkdir -p ~/bin
           curl -s https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
           chmod a+x ~/bin/repo
@@ -60,12 +63,14 @@ jobs:
             mkdir -p workspace/treble_aosp/phh/treble/media
             cp bootanimation.zip workspace/treble_aosp/phh/treble/media/bootanimation.zip
             echo 'PRODUCT_COPY_FILES += phh/treble/media/bootanimation.zip:$(TARGET_COPY_OUT_PRODUCT)/media/bootanimation.zip' >> workspace/treble_aosp/phh/treble/base.mk
+            echo "Bootanimation injected successfully!"
+          else
+            echo "No bootanimation.zip found in repository root, skipping."
           fi
 
       - name: Build arm64_bvN
         run: |
           cd workspace
-          # Repo bitti, 15-20GB .repo klasörünü derlemeden hemen önce siliyoruz
           rm -rf .repo
           echo "Disk after removing .repo:"
           df -h
@@ -77,17 +82,21 @@ jobs:
           IMG=$(find out -name "system-*.img" | head -n 1)
           echo "Found $IMG"
           [ -z "$IMG" ] && exit 1
-          # out içindeki gereksiz ara dosyaları temizle
           find out -type f ! -name "*.img" -delete
           xz -9 -T0 "$IMG"
           mv out/target/product/*.img.xz ../QuasarOS-arm64_bvN.img.xz
           df -h
 
-      - name: Create Release
+      - name: Create Public Release
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: QuasarOS-v1.0-${{ github.run_number }}
           name: QuasarOS v1.0 - Light The Galaxy
+          body: |
+            QuasarOS v1.0 - Light The Galaxy
+            * **Maintainer:** KernelMasterX
+            * **Base:** Android 13.0
+            * **Variant:** arm64_bvN (Standard VNDK, Vanilla)
           files: QuasarOS-arm64_bvN.img.xz
           
