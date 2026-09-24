@@ -1,8 +1,6 @@
 name: QuasarOS A13 Light The Galaxy
-
 on:
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -11,7 +9,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Araçlar Kur
-        run: sudo apt-get update && sudo apt-get install -y e2fsprogs unzip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y e2fsprogs unzip python3-pip
+          pip3 install requests
 
       - name: Ponces A13 Vanilla İndir
         run: |
@@ -21,43 +22,59 @@ jobs:
           cp base.img raw.img
           ls -lh raw.img
 
-      - name: BitGApps Core A13 İndir
+      - name: BitGApps Mediafire'dan İndir
         run: |
-          wget https://github.com/BiTGApps/BiTGApps-Release/releases/download/v4.2/BiTGApps-arm64-13.0.0-v4.2-CORE.zip -O bit.zip
+          python3 - << 'PY'
+          import requests, re
+          url = "https://www.mediafire.com/file/jrh0rbj8tcd7jda/BiTGApps-arm64-13.0.0-20260822-112657-CORE.zip/file?dkey=akpvn8fyvmc&r=1155"
+          headers = {"User-Agent": "Mozilla/5.0"}
+          print(f"Sayfa: {url}")
+          r = requests.get(url, headers=headers)
+          m = re.search(r'href="(https://download\d+\.mediafire\.com[^"]+)"', r.text)
+          if not m:
+              m = re.search(r'href="(https://download[^"]+mediafire[^"]+)"', r.text)
+          if not m:
+              print(r.text[:3000])
+              raise SystemExit("Direct link bulunamadı")
+          dl = m.group(1).replace("&amp;", "&")
+          print(f"Direct: {dl}")
+          with requests.get(dl, stream=True, headers=headers) as d:
+              d.raise_for_status()
+              with open("bit.zip", "wb") as f:
+                  for chunk in d.iter_content(1024*1024):
+                      if chunk: f.write(chunk)
+          print("bit.zip indirildi")
+          PY
           unzip bit.zip -d bit
-          ls -R bit | head -n 50
+          ls -R bit | head -n 100
 
       - name: Quasar Modla - Light The Galaxy
         run: |
           mkdir mnt
           sudo mount -o loop raw.img mnt
 
-          # 1. BitGApps Göm
           echo "BitGApps gömülüyor..."
           sudo cp -r bit/*/system/* mnt/system/ 2>/dev/null || true
           sudo cp -a bit/BiTGApps/* mnt/ 2>/dev/null || true
 
-          # 2. Bootanimation - main branch'ten
           echo "Bootanimation kontrol..."
-          ls -lh
+          ls -lh bootanimation.zip || echo "bootanimation.zip yok"
           if [ -f bootanimation.zip ]; then
-            echo "bootanimation.zip bulundu!"
+            sudo mkdir -p mnt/system/media
             sudo cp bootanimation.zip mnt/system/media/bootanimation.zip
             sudo chmod 644 mnt/system/media/bootanimation.zip
-          else
-            echo "bootanimation.zip yok, atlanıyor"
+            echo "Bootanimation gömüldü"
           fi
 
-          # 3. build.prop - Slogan
+          echo "build.prop düzenleniyor..."
           echo "" | sudo tee -a mnt/system/build.prop
           echo "# QuasarOS - Light the Galaxy" | sudo tee -a mnt/system/build.prop
           echo "ro.quasar.version=1.0" | sudo tee -a mnt/system/build.prop
           echo "ro.quasar.slogan=Light the Galaxy" | sudo tee -a mnt/system/build.prop
           echo "ro.quasar.base=Ponces A13 Vanilla" | sudo tee -a mnt/system/build.prop
-          echo "ro.quasar.gapps=BiTGApps-Core" | sudo tee -a mnt/system/build.prop
-          
+          echo "ro.quasar.gapps=BiTGApps-Core-20260822" | sudo tee -a mnt/system/build.prop
+
           sudo umount mnt
-          echo "Paketleniyor..."
           mv raw.img QuasarOS-A13-LightTheGalaxy.img
           xz -9 -T0 QuasarOS-A13-LightTheGalaxy.img
           ls -lh
