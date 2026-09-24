@@ -14,41 +14,53 @@ jobs:
 
       - name: Ponces A13 Vanilla İndir
         run: |
-          wget https://github.com/ponces/treble_aosp/releases/download/v2023.09.19/aosp-arm64-ab-vanilla-13.0-20230919.img.xz -O base.xz
-          xz -d base.xz
-          simg2img aosp-arm64-ab-vanilla-13.0-20230919.img raw.img
+          wget https://github.com/ponces/treble_aosp/releases/download/v2023.09.19/aosp-arm64-ab-vanilla-13.0-20230919.img.xz
+          xz -d *.xz
+          IMG=$(ls *.img | head -n1)
+          mv "$IMG" base.img
+          simg2img base.img raw.img
 
       - name: BitGApps Core A13 İndir
         run: |
           wget https://github.com/BiTGApps/BiTGApps-Release/releases/download/v4.2/BiTGApps-arm64-13.0.0-v4.2-CORE.zip -O bit.zip
           unzip bit.zip -d bit
-          ls -R bit
 
-      - name: Göm ve Quasar'a Çevir
+      - name: Quasar Modla
         run: |
           mkdir mnt
           sudo mount -o loop raw.img mnt
 
-          # BitGApps'ı göm (A13 yapısı)
+          # 1. BitGApps göm
           sudo cp -r bit/*/system/* mnt/system/ 2>/dev/null || true
-          sudo cp -r bit/system/* mnt/system/ 2>/dev/null || true
           sudo cp -a bit/BiTGApps/* mnt/ 2>/dev/null || true
 
-          # Quasar branding
-          echo "" | sudo tee -a mnt/system/build.prop
-          echo "ro.quasar.os=1.0" | sudo tee -a mnt/system/build.prop
-          echo "ro.quasar.gapps=BiTGApps-Core-A13" | sudo tee -a mnt/system/build.prop
-          echo "ro.quasar.base=Ponces-20230919" | sudo tee -a mnt/system/build.prop
+          # 2. Bootanimation - main branch'ten
+          if [ -f bootanimation.zip ]; then
+            echo "Bootanimation bulundu, gömülüyor..."
+            sudo cp bootanimation.zip mnt/system/media/bootanimation.zip
+            sudo chmod 644 mnt/system/media/bootanimation.zip
+          else
+            echo "bootanimation.zip bulunamadı!"
+            ls -la
+          fi
 
-          # Bootanimation varsa
-          [ -f mod_files/bootanimation.zip ] && sudo cp mod_files/bootanimation.zip mnt/system/media/ || true
+          # 3. build.prop - Light the Galaxy
+          echo "" | sudo tee -a mnt/system/build.prop
+          echo "# QuasarOS - Light the Galaxy" | sudo tee -a mnt/system/build.prop
+          echo "ro.quasar.version=1.0" | sudo tee -a mnt/system/build.prop
+          echo "ro.quasar.slogan=Light the Galaxy" | sudo tee -a mnt/system/build.prop
+          echo "ro.quasar.base=Ponces A13 Vanilla" | sudo tee -a mnt/system/build.prop
+          echo "ro.quasar.gapps=BiTGApps-Core" | sudo tee -a mnt/system/build.prop
+
+          # product/build.prop'a da ekle (bazı GSI'lar oradan okuyor)
+          echo "ro.quasar.slogan=Light the Galaxy" | sudo tee -a mnt/system/product/build.prop 2>/dev/null || true
 
           sudo umount mnt
-          mv raw.img QuasarOS-A13-GApps.img
-          xz -9 -T0 QuasarOS-A13-GApps.img
+          mv raw.img QuasarOS-A13-LightTheGalaxy.img
+          xz -9 -T0 QuasarOS-A13-LightTheGalaxy.img
 
       - name: Yükle
         uses: actions/upload-artifact@v4
         with:
-          name: QuasarOS-A13-BitGApps
-          path: QuasarOS-A13-GApps.img.xz
+          name: QuasarOS-A13-LightTheGalaxy
+          path: QuasarOS-A13-LightTheGalaxy.img.xz
