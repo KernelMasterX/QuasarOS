@@ -84,6 +84,9 @@ jobs:
         run: |
           cd workspace
           rm -rf .repo
+          mkdir -p tmp_build
+          export TMPDIR="$(pwd)/tmp_build"
+          echo "TMPDIR set to: $TMPDIR"
           echo "Disk after removing .repo:"
           df -h
           export WITHOUT_CHECK_API=true
