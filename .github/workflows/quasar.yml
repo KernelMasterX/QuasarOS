@@ -1,4 +1,4 @@
-name: QuasarOS A13 + BitGApps
+name: QuasarOS A13 Light The Galaxy
 
 on:
   workflow_dispatch:
@@ -7,67 +7,60 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Araçlar
-        run: sudo apt-get update && sudo apt-get install -y simg2img e2fsprogs unzip
+      - name: Araçlar Kur
+        run: sudo apt-get update && sudo apt-get install -y e2fsprogs unzip
 
-            - name: Ponces A13 Vanilla İndir
+      - name: Ponces A13 Vanilla İndir
         run: |
           wget https://github.com/ponces/treble_aosp/releases/download/v2023.09.19/aosp-arm64-ab-vanilla-13.0-20230919.img.xz
           xz -d *.xz
-          IMG=$(ls *.img | head -n1)
-          mv "$IMG" base.img
-          
-          # Sparse mi Raw mı kontrol et
-          if file base.img | grep -q "sparse"; then
-            echo "Sparse imaj, raw'a çeviriliyor..."
-            simg2img base.img raw.img
-          else
-            echo "Zaten Raw ext4, direkt kullanılıyor..."
-            cp base.img raw.img
-          fi
-          
+          mv *.img base.img
+          cp base.img raw.img
           ls -lh raw.img
 
       - name: BitGApps Core A13 İndir
         run: |
           wget https://github.com/BiTGApps/BiTGApps-Release/releases/download/v4.2/BiTGApps-arm64-13.0.0-v4.2-CORE.zip -O bit.zip
           unzip bit.zip -d bit
+          ls -R bit | head -n 50
 
-      - name: Quasar Modla
+      - name: Quasar Modla - Light The Galaxy
         run: |
           mkdir mnt
           sudo mount -o loop raw.img mnt
 
-          # 1. BitGApps göm
+          # 1. BitGApps Göm
+          echo "BitGApps gömülüyor..."
           sudo cp -r bit/*/system/* mnt/system/ 2>/dev/null || true
           sudo cp -a bit/BiTGApps/* mnt/ 2>/dev/null || true
 
           # 2. Bootanimation - main branch'ten
+          echo "Bootanimation kontrol..."
+          ls -lh
           if [ -f bootanimation.zip ]; then
-            echo "Bootanimation bulundu, gömülüyor..."
+            echo "bootanimation.zip bulundu!"
             sudo cp bootanimation.zip mnt/system/media/bootanimation.zip
             sudo chmod 644 mnt/system/media/bootanimation.zip
           else
-            echo "bootanimation.zip bulunamadı!"
-            ls -la
+            echo "bootanimation.zip yok, atlanıyor"
           fi
 
-          # 3. build.prop - Light the Galaxy
+          # 3. build.prop - Slogan
           echo "" | sudo tee -a mnt/system/build.prop
           echo "# QuasarOS - Light the Galaxy" | sudo tee -a mnt/system/build.prop
           echo "ro.quasar.version=1.0" | sudo tee -a mnt/system/build.prop
           echo "ro.quasar.slogan=Light the Galaxy" | sudo tee -a mnt/system/build.prop
           echo "ro.quasar.base=Ponces A13 Vanilla" | sudo tee -a mnt/system/build.prop
           echo "ro.quasar.gapps=BiTGApps-Core" | sudo tee -a mnt/system/build.prop
-
-          # product/build.prop'a da ekle (bazı GSI'lar oradan okuyor)
-          echo "ro.quasar.slogan=Light the Galaxy" | sudo tee -a mnt/system/product/build.prop 2>/dev/null || true
-
+          
           sudo umount mnt
+          echo "Paketleniyor..."
           mv raw.img QuasarOS-A13-LightTheGalaxy.img
           xz -9 -T0 QuasarOS-A13-LightTheGalaxy.img
+          ls -lh
 
       - name: Yükle
         uses: actions/upload-artifact@v4
