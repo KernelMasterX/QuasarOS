@@ -12,13 +12,23 @@ jobs:
       - name: Araçlar
         run: sudo apt-get update && sudo apt-get install -y simg2img e2fsprogs unzip
 
-      - name: Ponces A13 Vanilla İndir
+            - name: Ponces A13 Vanilla İndir
         run: |
           wget https://github.com/ponces/treble_aosp/releases/download/v2023.09.19/aosp-arm64-ab-vanilla-13.0-20230919.img.xz
           xz -d *.xz
           IMG=$(ls *.img | head -n1)
           mv "$IMG" base.img
-          simg2img base.img raw.img
+          
+          # Sparse mi Raw mı kontrol et
+          if file base.img | grep -q "sparse"; then
+            echo "Sparse imaj, raw'a çeviriliyor..."
+            simg2img base.img raw.img
+          else
+            echo "Zaten Raw ext4, direkt kullanılıyor..."
+            cp base.img raw.img
+          fi
+          
+          ls -lh raw.img
 
       - name: BitGApps Core A13 İndir
         run: |
