@@ -10,7 +10,6 @@ jobs:
       contents: write
 
     steps:
-      # 1. Önce diski büyütüp workspace'i /mnt alanına v10 sürümüyle bağlıyoruz
       - name: Maximize Build Space
         uses: easimon/maximize-build-space@v10
         with:
@@ -23,7 +22,6 @@ jobs:
           remove-codeql: 'true'
           remove-docker-images: 'true'
 
-      # 2. Büyütülen diskin üzerine repoyu ve bootanimation.zip'i çekiyoruz
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -44,98 +42,15 @@ jobs:
           chmod a+x ~/bin/repo
           echo "$HOME/bin" >> $GITHUB_PATH
 
-      - name: Repo Init & Sync
+      - name: Clone Treble Build Only
         run: |
           mkdir workspace && cd workspace
-          repo init -u https://github.com/TrebleDroid/treble_manifest -b android-13.0 -m manifest.xml
-          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc --all) --force-sync
           git clone https://github.com/ponces/treble_aosp -b android-13.0 treble_build_aosp --depth=1
           ln -s treble_build_aosp treble_aosp
-          echo "Disk after sync:"
-          df -h
-          ls -la
 
-      - name: Inspect build.sh sync logic
+      # Sadece teşhis - henüz sync/build yapmıyoruz, önce script'in tam içeriğini görelim
+      - name: Dump full build.sh content
         run: |
-          echo "===== sync-related lines in build.sh ====="
-          grep -n -i "repo sync\|repo init\|manifest" workspace/treble_build_aosp/build.sh || true
-          echo "===== files in treble_build_aosp ====="
-          ls -la workspace/treble_build_aosp
-
-      - name: Apply QuasarOS Branding
-        run: |
-          BASE=$(find workspace -name "base.mk" | grep "phh/treble" | head -n 1)
-          echo "Found base.mk at: $BASE"
-          [ -z "$BASE" ] && exit 1
-          echo '' >> "$BASE"
-          echo 'PRODUCT_MODEL := QuasarOS - Light The Galaxy' >> "$BASE"
-          echo 'PRODUCT_BRAND := QuasarOS' >> "$BASE"
-          echo 'PRODUCT_PROPERTY_OVERRIDES += ro.quasar.display.version=Light\ The\ Galaxy' >> "$BASE"
-          echo 'PRODUCT_PROPERTY_OVERRIDES += ro.product.maintainer=KernelMasterX' >> "$BASE"
-          cat "$BASE" | tail -10
-
-      - name: Inject Bootanimation
-        run: |
-          BASE=$(find workspace -name "base.mk" | grep "phh/treble" | head -n 1)
-          if [ -n "$BASE" ] && [ -f "bootanimation.zip" ]; then
-            BASE_DIR=$(dirname "$BASE")
-            mkdir -p "$BASE_DIR/media"
-            cp bootanimation.zip "$BASE_DIR/media/bootanimation.zip"
-            echo 'PRODUCT_COPY_FILES += device/phh/treble/media/bootanimation.zip:$(TARGET_COPY_OUT_PRODUCT)/media/bootanimation.zip' >> "$BASE"
-            echo "Bootanimation injected successfully!"
-          else
-            echo "bootanimation.zip not found or base.mk missing, skipping injection."
-          fi
-
-      - name: Build arm64_bvN
-        run: |
-          cd workspace
-          rm -rf .repo
-          mkdir -p tmp_build
-          export TMPDIR="$(pwd)/tmp_build"
-          echo "TMPDIR set to: $TMPDIR"
-          echo "Disk before build:"
-          df -h
-          export WITHOUT_CHECK_API=true
-          export CCACHE_DISABLE=1
-
-          # Build'i arka planda başlat
-          bash treble_build_aosp/build.sh arm64_bvN &
-          BUILD_PID=$!
-
-          # Build sürerken periyodik olarak alan aç: tamamlanmış .git geçmişlerini
-          # ve gereksiz test/doküman dizinlerini agresifçe sil
-          while kill -0 $BUILD_PID 2>/dev/null; do
-            sleep 180
-            find . -name ".git" -type d -prune -exec rm -rf {} + 2>/dev/null || true
-            rm -rf cts test/vts external/*tests* docs sdk/docs 2>/dev/null || true
-            echo "--- Disk check ($(date +%T)) ---"
-            df -h
-            sleep 120
-          done
-
-          wait $BUILD_PID
-
-      - name: Compress & Release
-        run: |
-          cd workspace
-          IMG=$(find out -name "system-*.img" | head -n 1)
-          echo "Found $IMG"
-          [ -z "$IMG" ] && exit 1
-          find out -type f ! -name "*.img" -delete
-          xz -9 -T0 "$IMG"
-          mv out/target/product/*.img.xz ../QuasarOS-arm64_bvN.img.xz
-          df -h
-
-      - name: Create Public Release
-        uses: softprops/action-gh-release@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: QuasarOS-v1.0-${{ github.run_number }}
-          name: QuasarOS v1.0 - Light The Galaxy
-          body: |
-            QuasarOS v1.0 - Light The Galaxy
-            * **Maintainer:** KernelMasterX
-            * **Base:** Android 13.0 (TrebleDroid)
-            * **Variant:** arm64_bvN (Standard VNDK, Vanilla)
-          files: QuasarOS-arm64_bvN.img.xz
+          echo "===== FULL build.sh ====="
+          cat -A workspace/treble_build_aosp/build.sh | cat -n
+          echo "===== END build.sh ====="
