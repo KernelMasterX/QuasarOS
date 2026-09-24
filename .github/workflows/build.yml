@@ -10,21 +10,7 @@ jobs:
       contents: write
 
     steps:
-      - name: Maximize Build Space
-        uses: easimon/maximize-build-space@v10
-        with:
-          root-reserve-mb: 8192
-          swap-size-mb: 1024
-          build-mount-path: ${{ github.workspace }}
-          remove-dotnet: 'true'
-          remove-android: 'true'
-          remove-haskell: 'true'
-          remove-codeql: 'true'
-          remove-docker-images: 'true'
-
-      - name: Checkout
-        uses: actions/checkout@v4
-
+      # 1. Root'ta hâlâ bol yer varken paketleri kur
       - name: Install Deps & Repo & Auth
         run: |
           export DEBIAN_FRONTEND=noninteractive
@@ -42,14 +28,28 @@ jobs:
           chmod a+x ~/bin/repo
           echo "$HOME/bin" >> $GITHUB_PATH
 
+      # 2. Şimdi diski büyütüp workspace'i buna mount ediyoruz
+      - name: Maximize Build Space
+        uses: easimon/maximize-build-space@v10
+        with:
+          root-reserve-mb: 8192
+          swap-size-mb: 1024
+          build-mount-path: ${{ github.workspace }}
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-docker-images: 'true'
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Clone Treble Build
         run: |
           mkdir workspace && cd workspace
           git clone https://github.com/ponces/treble_aosp -b android-13.0 treble_build_aosp --depth=1
           ln -s treble_build_aosp treble_aosp
 
-      # build.sh'in yapacağı sync'in aynısı — ama artık shallow (--depth=1),
-      # git geçmişi indirilmiyor, sadece çalışma ağacı (working tree)
       - name: Repo Init & Sync
         run: |
           cd workspace
@@ -60,8 +60,6 @@ jobs:
           echo "Disk after sync:"
           df -h
 
-      # Branding + bootanimation komutlarını ayrı bir dosyaya yazıyoruz,
-      # build.sh'in applyPatches()'ten SONRA çalıştırması için
       - name: Prepare Branding Hook
         working-directory: workspace
         run: |
@@ -93,8 +91,6 @@ jobs:
           echo "Hook file ready:"
           cat branding_hook.sh
 
-      # build.sh'i patch'liyoruz: gapps varyantını kaldır + branding hook'unu
-      # applyPatches çağrısından hemen sonraya enjekte et
       - name: Patch build.sh
         working-directory: workspace
         run: |
