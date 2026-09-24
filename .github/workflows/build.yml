@@ -48,19 +48,20 @@ jobs:
           git clone https://github.com/ponces/treble_aosp -b android-13.0 treble_build_aosp --depth=1
           ln -s treble_build_aosp treble_aosp
 
-      # build.sh'in yapacağı GERÇEK sync'in birebir aynısı — tek seferlik, .repo silinmiyor
+      # build.sh'in yapacağı sync'in aynısı — ama artık shallow (--depth=1),
+      # git geçmişi indirilmiyor, sadece çalışma ağacı (working tree)
       - name: Repo Init & Sync
         run: |
           cd workspace
-          repo init -u https://android.googlesource.com/platform/manifest -b android-13.0.0_r82
+          repo init -u https://android.googlesource.com/platform/manifest -b android-13.0.0_r82 --depth=1
           mkdir -p .repo/local_manifests
           cp treble_build_aosp/manifest.xml .repo/local_manifests/aosp.xml
-          repo sync -c --force-sync --no-clone-bundle --no-tags -j$(nproc --all)
+          repo sync -c --force-sync --no-clone-bundle --no-tags --depth=1 -j$(nproc --all)
           echo "Disk after sync:"
           df -h
 
       # Branding + bootanimation komutlarını ayrı bir dosyaya yazıyoruz,
-      # build.sh'in applyPatches()'ten SONRA çalıştırması için (generate.sh'in ezmesini önlemek için)
+      # build.sh'in applyPatches()'ten SONRA çalıştırması için
       - name: Prepare Branding Hook
         working-directory: workspace
         run: |
