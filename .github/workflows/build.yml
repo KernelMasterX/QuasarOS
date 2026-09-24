@@ -31,7 +31,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev \
             gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses-dev x11proto-core-dev libx11-dev \
-            lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig python3 openjdk-11-jdk
+            lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig python3 openjdk-11-jdk jq
 
           git config --global user.name "KernelMasterX"
           git config --global user.email "KernelMasterX@users.noreply.github.com"
@@ -42,15 +42,97 @@ jobs:
           chmod a+x ~/bin/repo
           echo "$HOME/bin" >> $GITHUB_PATH
 
-      - name: Clone Treble Build Only
+      - name: Clone Treble Build
         run: |
           mkdir workspace && cd workspace
           git clone https://github.com/ponces/treble_aosp -b android-13.0 treble_build_aosp --depth=1
           ln -s treble_build_aosp treble_aosp
 
-      # Sadece teşhis - henüz sync/build yapmıyoruz, önce script'in tam içeriğini görelim
-      - name: Dump full build.sh content
+      # build.sh'in yapacağı GERÇEK sync'in birebir aynısı — tek seferlik, .repo silinmiyor
+      - name: Repo Init & Sync
         run: |
-          echo "===== FULL build.sh ====="
-          cat -A workspace/treble_build_aosp/build.sh | cat -n
-          echo "===== END build.sh ====="
+          cd workspace
+          repo init -u https://android.googlesource.com/platform/manifest -b android-13.0.0_r82
+          mkdir -p .repo/local_manifests
+          cp treble_build_aosp/manifest.xml .repo/local_manifests/aosp.xml
+          repo sync -c --force-sync --no-clone-bundle --no-tags -j$(nproc --all)
+          echo "Disk after sync:"
+          df -h
+
+      # Branding + bootanimation komutlarını ayrı bir dosyaya yazıyoruz,
+      # build.sh'in applyPatches()'ten SONRA çalıştırması için (generate.sh'in ezmesini önlemek için)
+      - name: Prepare Branding Hook
+        working-directory: workspace
+        run: |
+          cat > branding_hook.sh << 'HOOK'
+          echo "--> Applying QuasarOS branding (post-patch hook)"
+          BASE=$(find . -name "base.mk" | grep "phh/treble" | head -n 1)
+          echo "Found base.mk at: $BASE"
+          if [ -n "$BASE" ]; then
+              echo '' >> "$BASE"
+              echo 'PRODUCT_MODEL := QuasarOS - Light The Galaxy' >> "$BASE"
+              echo 'PRODUCT_BRAND := QuasarOS' >> "$BASE"
+              echo 'PRODUCT_PROPERTY_OVERRIDES += ro.quasar.display.version=Light\ The\ Galaxy' >> "$BASE"
+              echo 'PRODUCT_PROPERTY_OVERRIDES += ro.product.maintainer=KernelMasterX' >> "$BASE"
+
+              if [ -f "../bootanimation.zip" ]; then
+                  BASE_DIR=$(dirname "$BASE")
+                  mkdir -p "$BASE_DIR/media"
+                  cp ../bootanimation.zip "$BASE_DIR/media/bootanimation.zip"
+                  echo 'PRODUCT_COPY_FILES += device/phh/treble/media/bootanimation.zip:$(TARGET_COPY_OUT_PRODUCT)/media/bootanimation.zip' >> "$BASE"
+                  echo "Bootanimation injected successfully!"
+              else
+                  echo "bootanimation.zip not found, skipping injection."
+              fi
+          else
+              echo "base.mk not found, branding skipped!"
+          fi
+          echo
+          HOOK
+          echo "Hook file ready:"
+          cat branding_hook.sh
+
+      # build.sh'i patch'liyoruz: gapps varyantını kaldır + branding hook'unu
+      # applyPatches çağrısından hemen sonraya enjekte et
+      - name: Patch build.sh
+        working-directory: workspace
+        run: |
+          sed -i \
+            -e '/^buildGappsVariant$/d' \
+            -e '/system-treble_arm64_bgN\.img -T0/d' \
+            -e '/^applyPatches$/r branding_hook.sh' \
+            treble_build_aosp/build.sh
+          echo "===== Patched sequence (end of file) ====="
+          tail -30 treble_build_aosp/build.sh
+
+      - name: Build (vanilla only)
+        working-directory: workspace
+        run: |
+          mkdir -p tmp_build
+          export TMPDIR="$(pwd)/tmp_build"
+          echo "Disk before build:"
+          df -h
+          export WITHOUT_CHECK_API=true
+          export CCACHE_DISABLE=1
+          bash treble_build_aosp/build.sh
+
+      - name: Locate & Release
+        run: |
+          IMG=$(find "$HOME/builds" -name "aosp-arm64-ab-vanilla-13.0-*.img.xz" | head -n 1)
+          echo "Found $IMG"
+          [ -z "$IMG" ] && exit 1
+          cp "$IMG" QuasarOS-arm64_bvN.img.xz
+          df -h
+
+      - name: Create Public Release
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: QuasarOS-v1.0-${{ github.run_number }}
+          name: QuasarOS v1.0 - Light The Galaxy
+          body: |
+            QuasarOS v1.0 - Light The Galaxy
+            * **Maintainer:** KernelMasterX
+            * **Base:** Android 13.0 (TrebleDroid)
+            * **Variant:** arm64_bvN (Standard VNDK, Vanilla)
+          files: QuasarOS-arm64_bvN.img.xz
