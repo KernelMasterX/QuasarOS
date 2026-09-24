@@ -55,6 +55,13 @@ jobs:
           df -h
           ls -la
 
+      - name: Inspect build.sh sync logic
+        run: |
+          echo "===== sync-related lines in build.sh ====="
+          grep -n -i "repo sync\|repo init\|manifest" workspace/treble_build_aosp/build.sh || true
+          echo "===== files in treble_build_aosp ====="
+          ls -la workspace/treble_build_aosp
+
       - name: Apply QuasarOS Branding
         run: |
           BASE=$(find workspace -name "base.mk" | grep "phh/treble" | head -n 1)
