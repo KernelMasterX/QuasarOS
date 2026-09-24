@@ -1,0 +1,54 @@
+name: QuasarOS A13 + BitGApps
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Araçlar
+        run: sudo apt-get update && sudo apt-get install -y simg2img e2fsprogs unzip
+
+      - name: Ponces A13 Vanilla İndir
+        run: |
+          wget https://github.com/ponces/treble_aosp/releases/download/v2023.09.19/aosp-arm64-ab-vanilla-13.0-20230919.img.xz -O base.xz
+          xz -d base.xz
+          simg2img aosp-arm64-ab-vanilla-13.0-20230919.img raw.img
+
+      - name: BitGApps Core A13 İndir
+        run: |
+          wget https://github.com/BiTGApps/BiTGApps-Release/releases/download/v4.2/BiTGApps-arm64-13.0.0-v4.2-CORE.zip -O bit.zip
+          unzip bit.zip -d bit
+          ls -R bit
+
+      - name: Göm ve Quasar'a Çevir
+        run: |
+          mkdir mnt
+          sudo mount -o loop raw.img mnt
+
+          # BitGApps'ı göm (A13 yapısı)
+          sudo cp -r bit/*/system/* mnt/system/ 2>/dev/null || true
+          sudo cp -r bit/system/* mnt/system/ 2>/dev/null || true
+          sudo cp -a bit/BiTGApps/* mnt/ 2>/dev/null || true
+
+          # Quasar branding
+          echo "" | sudo tee -a mnt/system/build.prop
+          echo "ro.quasar.os=1.0" | sudo tee -a mnt/system/build.prop
+          echo "ro.quasar.gapps=BiTGApps-Core-A13" | sudo tee -a mnt/system/build.prop
+          echo "ro.quasar.base=Ponces-20230919" | sudo tee -a mnt/system/build.prop
+
+          # Bootanimation varsa
+          [ -f mod_files/bootanimation.zip ] && sudo cp mod_files/bootanimation.zip mnt/system/media/ || true
+
+          sudo umount mnt
+          mv raw.img QuasarOS-A13-GApps.img
+          xz -9 -T0 QuasarOS-A13-GApps.img
+
+      - name: Yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuasarOS-A13-BitGApps
+          path: QuasarOS-A13-GApps.img.xz
