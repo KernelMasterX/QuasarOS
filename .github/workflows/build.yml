@@ -15,7 +15,7 @@ jobs:
         uses: easimon/maximize-build-space@v10
         with:
           root-reserve-mb: 8192
-          swap-size-mb: 2048
+          swap-size-mb: 0
           build-mount-path: ${{ github.workspace }}
           remove-dotnet: 'true'
           remove-android: 'true'
@@ -87,11 +87,27 @@ jobs:
           mkdir -p tmp_build
           export TMPDIR="$(pwd)/tmp_build"
           echo "TMPDIR set to: $TMPDIR"
-          echo "Disk after removing .repo:"
+          echo "Disk before build:"
           df -h
           export WITHOUT_CHECK_API=true
           export CCACHE_DISABLE=1
-          bash treble_build_aosp/build.sh arm64_bvN
+
+          # Build'i arka planda başlat
+          bash treble_build_aosp/build.sh arm64_bvN &
+          BUILD_PID=$!
+
+          # Build sürerken periyodik olarak alan aç: tamamlanmış .git geçmişlerini
+          # ve gereksiz test/doküman dizinlerini agresifçe sil
+          while kill -0 $BUILD_PID 2>/dev/null; do
+            sleep 180
+            find . -name ".git" -type d -prune -exec rm -rf {} + 2>/dev/null || true
+            rm -rf cts test/vts external/*tests* docs sdk/docs 2>/dev/null || true
+            echo "--- Disk check ($(date +%T)) ---"
+            df -h
+            sleep 120
+          done
+
+          wait $BUILD_PID
 
       - name: Compress & Release
         run: |
